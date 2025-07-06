@@ -7,4 +7,3 @@ pydub
 torchaudio
 torch
 soundfile
-mysql-connector-python  # (Optional: can remove if you're now fully using PostgreSQL)
