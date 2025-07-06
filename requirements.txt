@@ -1,9 +1,10 @@
 Flask
+gunicorn
+psycopg2-binary
+speechbrain
 SpeechRecognition
-mysql-connector-python
 pydub
 torchaudio
 torch
-speechbrain
 soundfile
-gunicorn
+mysql-connector-python  # (Optional: can remove if you're now fully using PostgreSQL)

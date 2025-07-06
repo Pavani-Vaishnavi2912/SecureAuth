@@ -1,7 +1,12 @@
 services:
   - type: web
-    name: gesture-voice-auth
+    name: secureauth
     env: python
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "python app.py"
+    startCommand: "gunicorn app:app"
     plan: free
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: touchless_auth
+          property: connectionString

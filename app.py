@@ -3,7 +3,7 @@ import speech_recognition as sr
 import os
 import time
 from pydub import AudioSegment
-import mysql.connector
+import psycopg2
 import json
 from hand_gesture_utils import verify_gesture, flatten_landmarks
 from voice_utils import get_embedding, compare_embeddings
@@ -12,18 +12,15 @@ app = Flask(__name__)
 app.secret_key = 'supersecretkey123'
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024
 
-# ---------- Database Setup ---------- #
-db = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="",
-    database="touchless_auth"
-)
+# ---------- PostgreSQL Database Setup ---------- #
+import urllib.parse as up
+
+DATABASE_URL = os.environ.get("DATABASE_URL")  # ✅ Secure use of environment variable
+
+db = psycopg2.connect(DATABASE_URL, sslmode='require')
 
 def get_cursor():
-    if not db.is_connected():
-        db.reconnect()
-    return db.cursor(buffered=True)  # ✅ buffered avoids unread result errors
+    return db.cursor()
 
 # ---------- Routes ---------- #
 @app.route('/')
@@ -88,17 +85,14 @@ def login():
 
             stored_voice, stored_array_json, stored_embedding_json = result
 
-            # Voice phrase check
             if stored_voice.lower() != voice_text.lower():
                 return "❌ Voice phrase mismatch"
 
-            # Gesture check
             stored_array = json.loads(stored_array_json)
             input_array = json.loads(input_array_json)
             if not verify_gesture(input_array, stored_array):
                 return "❌ Gesture pattern mismatch"
 
-            # Voice identity check
             login_path = f'static/voices/{username}_login.wav'
             login_embedding = get_embedding(login_path)
             if not login_embedding:
@@ -129,7 +123,7 @@ def logout():
     session.pop('user', None)
     return redirect(url_for('index'))
 
-# ---------- Voice Upload + Conversion (Safe on Windows) ---------- #
+# ---------- Voice Upload ---------- #
 @app.route('/process_audio', methods=['POST'])
 def process_audio():
     if 'audio' not in request.files or 'username' not in request.form or 'mode' not in request.form:
@@ -140,24 +134,19 @@ def process_audio():
     audio_file = request.files['audio']
 
     try:
-        # Save WebM audio file manually to avoid lock issues
         temp_webm_path = f"temp_{username}_{mode}.webm"
         with open(temp_webm_path, 'wb') as f:
             f.write(audio_file.read())
 
-        # Wait a bit for Windows to release the file
         time.sleep(0.2)
 
-        # Convert to WAV
         temp_wav_path = f"temp_{username}_{mode}.wav"
         sound = AudioSegment.from_file(temp_webm_path, format='webm')
         sound.export(temp_wav_path, format='wav')
 
-        # Save to permanent location
         save_path = f'static/voices/{username}_{mode}.wav'
         sound.export(save_path, format='wav')
 
-        # Extract voice text
         recognizer = sr.Recognizer()
         with sr.AudioFile(temp_wav_path) as source:
             audio = recognizer.record(source)
@@ -168,7 +157,6 @@ def process_audio():
             except sr.RequestError:
                 voice_text = "Error"
 
-        # Cleanup temp files
         for f in [temp_webm_path, temp_wav_path]:
             try:
                 os.remove(f)
