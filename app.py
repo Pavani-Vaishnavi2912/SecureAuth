@@ -27,6 +27,26 @@ def get_cursor():
 def index():
     return render_template('index.html')
 
+@app.route('/init-db')
+def init_db():
+    try:
+        cursor = get_cursor()
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id SERIAL PRIMARY KEY,
+                username TEXT UNIQUE NOT NULL,
+                voice_text TEXT NOT NULL,
+                gesture_array TEXT NOT NULL,
+                voice_embedding TEXT NOT NULL
+            )
+        """)
+        db.commit()
+        cursor.close()
+        return "✅ Table created successfully!"
+    except Exception as e:
+        return f"❌ Error: {e}"
+
+
 # ---------- Register ---------- #
 @app.route('/register', methods=['GET', 'POST'])
 def register():
